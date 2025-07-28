@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 # توکن و آیدی
 TELEGRAM_TOKEN = "6356625866:AAGHHjzULscEYra8NUzRjSpXCSPl4lDxNJI"
 MAIN_ADMIN_ID = 550076399
-DATA_FILE = "/home/Amimoniya/bot_data.json"
-STATS_FILE = "/home/Amimoniya/bot_stats.json"
+DATA_FILE = "bot_data.json"
+STATS_FILE = "bot_stats.json"
 
 # تنظیمات اینستالودر
 L = instaloader.Instaloader()
@@ -261,87 +261,104 @@ async def show_posts(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     username = query.data.split("_")[1]
-    profile = instaloader.Profile.from_username(L.context, username)
-    if profile.is_private:
-        await query.message.reply_text("این اکانت خصوصی است!")
-        return
-    posts = list(profile.get_posts())[:5]
-    if not posts:
-        keyboard = [[InlineKeyboardButton("⬅️ بازگشت", callback_data="main_menu")]]
-        await query.message.edit_text("هیچ پستی پیدا نشد!", reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    keyboard = []
-    for post in posts:
-        keyboard.append([InlineKeyboardButton(post.title or "پست", callback_data=f"post_{post.shortcode}")])
-    keyboard.append([InlineKeyboardButton("⬅️ بازگشت", callback_data="main_menu")])
-    await query.message.edit_text(f"پست‌های {username}:", reply_markup=InlineKeyboardMarkup(keyboard))
+    try:
+        profile = instaloader.Profile.from_username(L.context, username)
+        if profile.is_private:
+            await query.message.reply_text("این اکانت خصوصی است!")
+            return
+        posts = list(profile.get_posts())[:5]
+        if not posts:
+            keyboard = [[InlineKeyboardButton("⬅️ بازگشت", callback_data="main_menu")]]
+            await query.message.edit_text("هیچ پستی پیدا نشد!", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+        keyboard = []
+        for post in posts:
+            keyboard.append([InlineKeyboardButton(post.title or "پست", callback_data=f"post_{post.shortcode}")])
+        keyboard.append([InlineKeyboardButton("⬅️ بازگشت", callback_data="main_menu")])
+        await query.message.edit_text(f"پست‌های {username}:", reply_markup=InlineKeyboardMarkup(keyboard))
+    except Exception as e:
+        logger.error(f"Error in show_posts: {str(e)}")
+        await query.message.reply_text(f"خطا: {str(e)}")
 
 # نمایش هایلایت‌ها
 async def show_highlights(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     username = query.data.split("_")[1]
-    profile = instaloader.Profile.from_username(L.context, username)
-    if profile.is_private:
-        await query.message.reply_text("این اکانت خصوصی است!")
-        return
-    highlights = L.get_highlights(profile)
-    if not highlights:
-        keyboard = [[InlineKeyboardButton("⬅️ بازگشت", callback_data="main_menu")]]
-        await query.message.edit_text("هیچ هایلایتی پیدا نشد!", reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    keyboard = []
-    for highlight in highlights:
-        keyboard.append([InlineKeyboardButton(highlight.title, callback_data=f"highlight_{highlight.unique_id}")])
-    keyboard.append([InlineKeyboardButton("⬅️ بازگشت", callback_data="main_menu")])
-    await query.message.edit_text(f"هایلایت‌های {username}:", reply_markup=InlineKeyboardMarkup(keyboard))
+    try:
+        profile = instaloader.Profile.from_username(L.context, username)
+        if profile.is_private:
+            await query.message.reply_text("این اکانت خصوصی است!")
+            return
+        highlights = L.get_highlights(profile)
+        if not highlights:
+            keyboard = [[InlineKeyboardButton("⬅️ بازگشت", callback_data="main_menu")]]
+            await query.message.edit_text("هیچ هایلایتی پیدا نشد!", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+        keyboard = []
+        for highlight in highlights:
+            keyboard.append([InlineKeyboardButton(highlight.title, callback_data=f"highlight_{highlight.unique_id}_{username}")])
+        keyboard.append([InlineKeyboardButton("⬅️ بازگشت", callback_data="main_menu")])
+        await query.message.edit_text(f"هایلایت‌های {username}:", reply_markup=InlineKeyboardMarkup(keyboard))
+    except Exception as e:
+        logger.error(f"Error in show_highlights: {str(e)}")
+        await query.message.reply_text(f"خطا: {str(e)}")
 
 # نمایش پست
 async def show_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     shortcode = query.data.split("_")[1]
-    post = instaloader.Post.from_shortcode(L.context, shortcode)
-    caption = post.caption or "بدون کپشن"
-    likes = post.likes
-    comments = post.comments
-    views = post.video_view_count if post.is_video else 0
-    response = (
-        f"📸 پست: {post.title or 'بدون عنوان'}\n"
-        f"📝 کپشن: {caption[:200]}...\n"
-        f"❤️ لایک: {likes}\n"
-        f"💬 کامنت: {comments}\n"
-        f"👀 بازدید: {views if views else 'نامشخص'}"
-    )
-    file_path = f"temp_{post.shortcode}.mp4" if post.is_video else f"temp_{post.shortcode}.jpg"
-    L.download_post(post, target=file_path)
-    log_download(query.from_user.id, "instagram_post", post.shortcode)
-    keyboard = [[InlineKeyboardButton("⬅️ بازگشت", callback_data="main_menu")]]
-    if post.is_video:
-        await query.message.reply_video(video=open(file_path, "rb"), caption=response, reply_markup=InlineKeyboardMarkup(keyboard))
-    else:
-        await query.message.reply_photo(photo=open(file_path, "rb"), caption=response, reply_markup=InlineKeyboardMarkup(keyboard))
-    os.remove(file_path)
+    try:
+        post = instaloader.Post.from_shortcode(L.context, shortcode)
+        caption = post.caption or "بدون کپشن"
+        likes = post.likes
+        comments = post.comments
+        views = post.video_view_count if post.is_video else 0
+        response = (
+            f"📸 پست: {post.title or 'بدون عنوان'}\n"
+            f"📝 کپشن: {caption[:200]}...\n"
+            f"❤️ لایک: {likes}\n"
+            f"💬 کامنت: {comments}\n"
+            f"👀 بازدید: {views if views else 'نامشخص'}"
+        )
+        file_path = f"temp_{post.shortcode}.mp4" if post.is_video else f"temp_{post.shortcode}.jpg"
+        L.download_post(post, target=file_path)
+        log_download(query.from_user.id, "instagram_post", post.shortcode)
+        keyboard = [[InlineKeyboardButton("⬅️ بازگشت", callback_data="main_menu")]]
+        if post.is_video:
+            await query.message.reply_video(video=open(file_path, "rb"), caption=response, reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            await query.message.reply_photo(photo=open(file_path, "rb"), caption=response, reply_markup=InlineKeyboardMarkup(keyboard))
+        os.remove(file_path)
+    except Exception as e:
+        logger.error(f"Error in show_post: {str(e)}")
+        await query.message.reply_text(f"خطا: {str(e)}")
 
 # نمایش هایلایت
 async def show_highlight(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    unique_id = query.data.split("_")[1]
-    highlights = L.get_highlights(instaloader.Profile.from_username(L.context, query.data.split("_")[1]))
-    for highlight in highlights:
-        if str(highlight.unique_id) == unique_id:
-            for item in highlight.get_items():
-                file_path = f"temp_{item.mediaid}.mp4" if item.is_video else f"temp_{item.mediaid}.jpg"
-                L.download_storyitem(item, target=file_path)
-                log_download(query.from_user.id, "instagram_highlight", item.mediaid)
-                keyboard = [[InlineKeyboardButton("⬅️ بازگشت", callback_data="main_menu")]]
-                if item.is_video:
-                    await query.message.reply_video(video=open(file_path, "rb"), caption=f"هایلایت: {highlight.title}", reply_markup=InlineKeyboardMarkup(keyboard))
-                else:
-                    await query.message.reply_photo(photo=open(file_path, "rb"), caption=f"هایلایت: {highlight.title}", reply_markup=InlineKeyboardMarkup(keyboard))
-                os.remove(file_path)
-            break
+    unique_id, username = query.data.split("_")[1:3]
+    try:
+        profile = instaloader.Profile.from_username(L.context, username)
+        highlights = L.get_highlights(profile)
+        for highlight in highlights:
+            if str(highlight.unique_id) == unique_id:
+                for item in highlight.get_items():
+                    file_path = f"temp_{item.mediaid}.mp4" if item.is_video else f"temp_{item.mediaid}.jpg"
+                    L.download_storyitem(item, target=file_path)
+                    log_download(query.from_user.id, "instagram_highlight", item.mediaid)
+                    keyboard = [[InlineKeyboardButton("⬅️ بازگشت", callback_data="main_menu")]]
+                    if item.is_video:
+                        await query.message.reply_video(video=open(file_path, "rb"), caption=f"هایلایت: {highlight.title}", reply_markup=InlineKeyboardMarkup(keyboard))
+                    else:
+                        await query.message.reply_photo(photo=open(file_path, "rb"), caption=f"هایلایت: {highlight.title}", reply_markup=InlineKeyboardMarkup(keyboard))
+                    os.remove(file_path)
+                break
+    except Exception as e:
+        logger.error(f"Error in show_highlight: {str(e)}")
+        await query.message.reply_text(f"خطا: {str(e)}")
 
 # آمار ربات
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
